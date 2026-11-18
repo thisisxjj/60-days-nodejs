@@ -1,20 +1,20 @@
 // Day 03 - 练习 1：目录树生成器
 
-import fs from 'node:fs/promises';
-import path from 'node:path';
+import fs from "node:fs/promises";
+import path from "node:path";
 
-const IGNORE = new Set(['node_modules', '.git']);
+const IGNORE = new Set(["node_modules", ".git"]);
 
 // 解析参数
 const args = process.argv.slice(2);
-const targetDir = args.find((a) => !a.startsWith('--')) || '.';
-const depthArg = args.find((a) => a.startsWith('--depth='));
-const maxDepth = depthArg ? parseInt(depthArg.split('=')[1], 10) : Infinity;
+const targetDir = args.find((a) => !a.startsWith("--")) || ".";
+const depthArg = args.find((a) => a.startsWith("--depth="));
+const maxDepth = depthArg ? parseInt(depthArg.split("=")[1], 10) : Infinity;
 
 let fileCount = 0;
 let dirCount = 0;
 
-async function printTree(dir, prefix = '', depth = 0) {
+async function printTree(dir, prefix = "", depth = 0) {
   if (depth > maxDepth) return;
 
   let entries;
@@ -35,8 +35,8 @@ async function printTree(dir, prefix = '', depth = 0) {
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
     const isLast = i === entries.length - 1;
-    const connector = isLast ? '└──' : '├──';
-    const childPrefix = prefix + (isLast ? '    ' : '│   ');
+    const connector = isLast ? "└──" : "├──";
+    const childPrefix = prefix + (isLast ? "    " : "│   ");
 
     console.log(`${prefix}${connector} ${entry.name}`);
 
