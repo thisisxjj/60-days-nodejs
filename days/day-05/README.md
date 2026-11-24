@@ -194,12 +194,10 @@ Node.js 的异步 I/O 能力来自 **libuv** 库：
 
 关键在于 **I/O 多路复用**（epoll/kqueue/IOCP）：
 
-1. Node.js 不为每个连接创建线程（不像传统 Java/PHP）
-2. 所有网络 I/O 由操作系统内核异步处理
-3. libuv 通过 epoll（Linux）/ kqueue（macOS）监听多个 I/O 事件
-4. 当 I/O 完成时，内核通知 libuv，libuv 触发 JS 回调
-5. CPU 密集型任务使用 libuv 的线程池（默认 4 个线程）
-
+1. Node.js 不为每个连接创建线程，而是在 一个线程里用 epoll/kqueue/IOCP 同时监听大量 socket。
+2. Linux/macOS 上，内核通知的是 socket 就绪。数据由 libuv 在事件循环线程中调用非阻塞的 read/write 搬运。Windows 的 IOCP 通知的是操作完成。
+3. 文件 I/O、dns.lookup、部分 crypto 和 zlib 在 libuv 线程池（默认 4 个线程）中以阻塞方式执行，完成后通过 eventfd 等机制通知主线程。
+4. JS 代码始终在主线程执行。CPU 密集的 JS 会阻塞事件循环，需要用 worker_threads 或 child_process 分担。
 ```javascript
 // 这就是为什么 Node.js 能同时处理数千个连接
 import http from 'node:http';
