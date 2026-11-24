@@ -157,10 +157,13 @@ async function asyncPool(limit, items, fn) {
 }
 
 // 使用示例：同时最多 3 个下载任务
-const urls = Array.from({ length: 20 }, (_, i) => `https://api.example.com/data/${i}`);
+const urls = Array.from({ length: 20 }, (_, i) => `https://jsonplaceholder.typicode.com/posts/${i + 1}`);
 
 const results = await asyncPool(3, urls, async (url) => {
   const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`请求失败：${response.status} ${url}`);
+  }
   return response.json();
 });
 ```

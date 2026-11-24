@@ -1,0 +1,119 @@
+import EventEmitter from "node:events";
+
+class TaskScheduler extends EventEmitter {
+  constructor(concurrency = 3) {
+    super();
+    this.concurrency = concurrency;
+    this.queue = [];
+    this.results = [];
+    this.completed = 0;
+    this.running = 0;
+    this.total = 0;
+  }
+
+  addTask(fn, priority = 0) {
+    const index = this.total++;
+    this.queue.push({ fn, priority, index });
+    this.results.push(undefined);
+  }
+
+  async run() {
+    this.queue.sort((a, b) => b.priority - a.priority);
+    this.emit("start", { total: this.total });
+
+    const executing = new Set();
+
+    for (const task of this.queue) {
+      const promise = this._simulate(task).then((result) => {
+        executing.delete(promise);
+        return result;
+      });
+
+      executing.add(promise);
+
+      if (executing.size >= this.concurrency) {
+        await Promise.race(executing);
+      }
+    }
+
+    await Promise.all(executing);
+
+    this.emit("finish", { total: this.total, results: this.results });
+    return this.results;
+  }
+
+  async _simulate({ fn, index }) {
+    this.running++;
+    this.emit("taskStart", { index, running: this.running });
+    try {
+      const value = await fn();
+      this.results[index] = { status: "fulfilled", value };
+    } catch (reason) {
+      this.results[index] = { status: "rejected", reason };
+    } finally {
+      this.completed++;
+      this.running--;
+    }
+
+    const result = this.results[index];
+    const progress = {
+      index,
+      running: this.running,
+      completed: this.completed,
+      total: this.total,
+    };
+
+    if (result.status === "fulfilled") {
+      this.emit("taskComplete", {
+        ...progress,
+        value: result.value,
+        percent: ((this.completed / this.total) * 100).toFixed(1),
+      });
+    } else {
+      this.emit("taskError", {
+        ...progress,
+        reason: result.reason,
+      });
+    }
+  }
+}
+
+// ── 演示 ─────────────────────────────────────────────────────
+
+function delay(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+const scheduler = new TaskScheduler(3);
+
+// 添加 10 个任务，部分设置优先级
+for (let i = 1; i <= 10; i++) {
+  const durationMs = 200 + Math.random() * 300;
+  const priority = i <= 3 ? 10 : 0; // 前 3 个任务优先级高
+
+  scheduler.addTask(async () => {
+    await delay(durationMs);
+    if (i === 7) throw new Error(`任务 ${i} 模拟失败`);
+    return `任务 ${i} 结果`;
+  }, priority);
+}
+
+scheduler.on("start", ({ total }) =>
+  console.log(`▶ 开始调度 ${total} 个任务（并发: 3）\n`),
+);
+scheduler.on("taskStart", ({ index, running }) => {
+  console.log(`  🚀 任务 #${index + 1} 开始  当前运行: ${running}`);
+});
+scheduler.on("taskComplete", ({ index, percent }) => {
+  console.log(`  ✅ 任务 #${index + 1} 完成  进度: ${percent}%`);
+});
+scheduler.on("taskError", ({ index, reason }) => {
+  console.log(`  ❌ 任务 #${index + 1} 失败  ${reason.message}`);
+});
+scheduler.on("finish", ({ results }) => {
+  const fulfilled = results.filter((r) => r.status === "fulfilled").length;
+  const rejected = results.filter((r) => r.status === "rejected").length;
+  console.log(`\n🎉 全部完成：成功 ${fulfilled}，失败 ${rejected}`);
+});
+
+await scheduler.run();
